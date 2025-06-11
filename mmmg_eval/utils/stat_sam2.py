@@ -72,7 +72,7 @@ def main():
     merged = {k: v for pair in results if pair for k, v in [pair]}
 
     # save
-    out_path = os.path.join(dest_dir, f"stat_{name}.json")
+    out_path = os.path.join(dest_dir, f"{name}.json")
     with open(out_path, "w") as f:
         json.dump(merged, f, indent=4)
     print(f"Saved {len(merged)} entries → {out_path}")

@@ -3,8 +3,7 @@ import json
 import os
 import re
 from pathlib import Path
-
-from datasets import load_dataset
+from all_configs import *
 from PIL import Image 
 from tqdm import tqdm
 
@@ -57,8 +56,6 @@ def parse_output_to_checklist(image_id, text, elements, dependencies):
                         dependency_dict[ele] = v_bool
                         find=True
                         break
-            if not find:
-                print(f"Key: {raw_k} -> CLEANED: {k_clean}")
                 
 
     return {
@@ -72,44 +69,41 @@ def main():
     parser = argparse.ArgumentParser(
         description="Merge model answers with MMMG ground truth."
     )
-    parser.add_argument("--result_folder", required=True,
+    parser.add_argument("--result_folder", "-o", required=True,
                         help="Path containing model-generated *.json files")
-    parser.add_argument("--image_folder", required=True,
+    parser.add_argument("--image_folder", "-i", required=True,
                         help="Root folder holding six sub-folders of images")
-    parser.add_argument("--model_name", required=True,
+    parser.add_argument("--api_name", "-a", required=True,
                         help="Key used in each result JSON to fetch the model output")
     parser.add_argument("--output_dir", required=True,
                         help="Folder to save merged result JSON")
-    parser.add_argument("--save_name", default="merged",
+    parser.add_argument("--save_name", default="step2_summarize",
                         help="Output file name (without .json)")
-    parser.add_argument("--hf_cache", default="~/.cache/mmmg",
+    parser.add_argument("--hf_cache", default="./data/MMMG",
                         help="HuggingFace cache dir")
     args = parser.parse_args()
 
     # ---------------- load MMMG ground truth ---------------------------------
-    ds = load_dataset(
-        "MMMGbench/MMMGBench",
-        split="test",
-        cache_dir=os.path.expanduser(args.hf_cache),
-        trust_remote_code=True,
+    full_dataset = load_all_mmmg_configs(
+        cache_dir=args.hf_cache, max_workers=16
     )
-    print(f"Loaded {len(ds):,} samples ✔️")
 
     # build lookup: {grade: {image_id: {elements, dependencies}}}
     gt = {}
-    for sample in ds:
+    for sample in full_dataset:
         grade = str(sample["Education"])   # e.g. "preschool"
         image_id = sample["key"]
         kg = json.loads(sample["Knowledge_Graph"])
         gt.setdefault(grade, {})[image_id] = kg
 
+    
     grade_map = {  # match folder names if they differ
         "preschool": "0_preschool",
         "primaryschool": "1_primaryschool",
         "secondaryschool": "2_secondaryschool",
         "highschool": "3_highschool",
         "undergraduate": "4_undergraduate",
-        "phd": "5_PhD",
+        "PhD": "5_PhD",
     }
 
     merged = {g: {} for g in grade_map}
@@ -125,11 +119,11 @@ def main():
             print(f"[skip] cannot parse {fn.name}: {e}")
             continue
 
-        if args.model_name not in data:
-            print(f"[skip] {fn.name}: no key '{args.model_name}'")
+        if args.api_name not in data:
+            print(f"[skip] {fn.name}: no key '{args.api_name}'")
             continue
 
-        text = data[args.model_name]        # LLM checklist
+        text = data[args.api_name]        # LLM checklist
         image_id = data["key"]              # assert match later
 
         parts = fn.stem.split("__")         # <grade>__<image_id>.json
@@ -171,7 +165,7 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{args.save_name}.json"
     out_path.write_text(json.dumps(merged, indent=2, ensure_ascii=False))
-    print(f"Done ✔️  saved to {out_path}")
+    print(f"Stage1 Evaluation Done ✔️. Saved to {out_path}")
 
 
 if __name__ == "__main__":

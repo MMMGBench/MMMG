@@ -1,38 +1,26 @@
 import os, sys
-# sys.path.append("/openseg_blob/v-junwenchen/detector/sam2")
-
-import json, re
-import time
+import json
 import argparse
 from tqdm import tqdm
+import cv2
 from PIL import Image, ImageDraw, ImageFont
 import base64
-import mimetypes
 import io
-
 import numpy as np
 import torch
 import torch.multiprocessing as mp
-from torchvision import transforms
-from transformers import AutoModelForImageSegmentation
-from transformers import AutoModel, AutoProcessor
 import os, sys, pathlib
 
 PROJ_ROOT = pathlib.Path(__file__).resolve().parent 
 SAM2_ROOT = PROJ_ROOT / "sam2"  
 
-# 2⃣ 提前插入到 sys.path，优先级靠前
 sys.path.insert(0, str(SAM2_ROOT))
 from sam2.build_sam import build_sam2
 from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
-
-import cv2
-import warnings
-warnings.filterwarnings("ignore")
-
 from paddleocr import PaddleOCR
 
-
+import warnings
+warnings.filterwarnings("ignore")
 
 
 def call_ppocr(image_pil, image_width, image_height,
@@ -118,7 +106,8 @@ def call_ppocr(image_pil, image_width, image_height,
         final_boxes.append((x1, y1, x2, y2))
 
     return final_texts, final_boxes
-import numpy as np
+
+
 
 def merge_sam_masks_with_ocr(sam_masks, ocr_boxes, image_size, iou_thresh=0.8, min_side=10):
     """
@@ -194,7 +183,6 @@ def save_anns(image, anns, image_save_folder, borders=True):
         color_mask = np.concatenate([np.random.random(3), [0.5]])
         img[m] = color_mask 
         if borders:
-            import cv2
             contours, _ = cv2.findContours(m.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE) 
             # Try to smooth contours
             contours = [cv2.approxPolyDP(contour, epsilon=0.01, closed=True) for contour in contours]
@@ -208,6 +196,8 @@ def save_anns(image, anns, image_save_folder, borders=True):
 
     result.save(f"{image_save_folder}/sam2_result.png")
 
+
+
 def get_all_images(folder_path):
     """
     Walk through a folder and its subfolders to get all image file paths.
@@ -219,7 +209,6 @@ def get_all_images(folder_path):
         list: A list of absolute paths to all image files.
     """
     image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif'}
-    # image_extensions = {'.jpg', '.png'}
     image_paths = []
 
     for root, _, files in os.walk(folder_path):
@@ -229,74 +218,53 @@ def get_all_images(folder_path):
     
     return image_paths
 
-def get_largest_mask_part(mask):
-    """
-    Extract the largest connected component from a gray mask and return it as a new mask.
+def summarize_single_file(src_dir, filename):
 
-    Args:
-        mask (numpy.ndarray): Input gray mask.
-
-    Returns:
-        numpy.ndarray: Gray mask containing only the largest connected component.
-    """
-    # Convert the mask to binary
-    binary_mask = (mask > 0).astype(np.uint8)
-
-    # Find connected components
-    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary_mask, connectivity=8)
-
-    if num_labels <= 1:
-        # No connected components found
-        return np.zeros_like(mask)
-
-    # Find the largest connected component (excluding the background)
-    largest_component_idx = np.argmax(stats[1:, cv2.CC_STAT_AREA]) + 1
-
-    # Create a binary mask for the largest connected component
-    largest_component_mask = (labels == largest_component_idx).astype(np.uint8)
-
-    # Use the binary mask to extract the corresponding part of the original gray mask
-    largest_mask = (largest_component_mask * mask).astype(np.uint8)
-
-    return largest_mask
-
-def alpha_mask_to_bbox(alpha_mask):
-    col_min = np.where(alpha_mask.max(axis=0) > 0)[0].min()
-    col_max = np.where(alpha_mask.max(axis=0) > 0)[0].max()
-    row_min = np.where(alpha_mask.max(axis=1) > 0)[0].min()
-    row_max = np.where(alpha_mask.max(axis=1) > 0)[0].max()
-
-    return np.array((col_min, row_min, col_max, row_max))
-
-def encode_image(image_pil):
-    """Encodes an image to base64 and determines the correct MIME type without disk I/O."""
-
-    mime_type = "image/jpeg"
-
+    file_path = os.path.join(src_dir, filename, "anno.json")
+    image_path = os.path.join(src_dir, filename, "sam2_result.png")
     try:
-        buffer = io.BytesIO()
+        with open(file_path, 'r') as f:
+            data = json.load(f)
 
-        image_pil.save(buffer, format="JPEG")
-        buffer.seek(0)
-        
-        encoded_string = base64.b64encode(buffer.read()).decode('utf-8')
-        return f"data:{mime_type};base64,{encoded_string}"
-    except (OSError, ValueError) as e:
-        print(f"Error processing image {e}")
+        key = data["image_uid"].split("__")[-1].split(".")[0]
+        region_count = data["region_count"]
+        org_img_path = data["image_path"]
+        sam_path = image_path
+
+        return key, {
+            "region_count": region_count,
+            "image_path": org_img_path,
+            "sam_path": sam_path
+        }
+    except Exception as e:
+        print(f"Error processing {filename}: {e}")
         return None
 
-def run_task(task_list, task_id, output_folder, prefix_remove="", save_yolo_results=True, save_rmbg_results=False, sam2_checkpoint=None):
+def mp_summarize(folder_path, save_name):
+
+    all_files = os.listdir(folder_path)
+    all_files = [f for f in all_files if os.path.isdir(os.path.join(folder_path, f))]
+
+    with mp.Pool(mp.cpu_count()) as pool:
+        results = pool.starmap(summarize_single_file, [(folder_path, f) for f in all_files])
+
+    summary_json = {k: v for r in results if r for k, v in [r]}
+
+    save_path = os.path.join(folder_path.strip("step2"), save_name + ".json")
+    with open(save_path, "w") as f:
+        json.dump(summary_json, f, indent=4)
+    
+    print(f"Readability Statistics saved to {save_path}. Stage 2 completed.")
+
+def run_task(task_list, task_id, output_folder, prefix_remove="", sam2_checkpoint=None):
     gpu_id = task_id % torch.cuda.device_count()
     device = torch.device(f"cuda:{gpu_id}")
     desc = f"task: {task_id}"
 
-    repeat_detection_time = 1  # 1 for the first time w/o mask
-    
+    assert sam2_checkpoint is not None, "Please provide a valid SAM2 checkpoint path."
     print("load sam2...")
-    # sam2_checkpoint = "/openseg_blob/v-junwenchen/detector/sam2/checkpoints/sam2.1_hiera_large.pt"
     model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
     sam2 = build_sam2(model_cfg, sam2_checkpoint, device=device, apply_postprocessing=False)
-    #mask_generator = SAM2AutomaticMaskGenerator(sam2)
     mask_generator = SAM2AutomaticMaskGenerator(
         model=sam2,
         points_per_side=32,
@@ -313,13 +281,10 @@ def run_task(task_list, task_id, output_folder, prefix_remove="", save_yolo_resu
 
     for task_i in tqdm(task_list, desc):
         image_path = task_i["image_path"]
-        
         image_uid = image_path.replace(prefix_remove, "").replace("/", "__")
-        
         image_suffix = image_path.split(".")[-1]
         
         image_save_folder = image_uid.replace(f".{image_suffix}", "")
-        
         
         image_save_folder = os.path.join(output_folder, image_save_folder)
         ann_json_path = f"{image_save_folder}/anno.json"
@@ -347,9 +312,9 @@ def run_task(task_list, task_id, output_folder, prefix_remove="", save_yolo_resu
             continue
 
         ocr_texts, ocr_boxes = call_ppocr(image_pil, image_width, image_height)
-        #print(f" {image_path} before: {len(masks)} {ocr_texts}, len(ocr_boxes): {len(ocr_boxes)}")
+        # print(f" {image_path} before: {len(masks)} {ocr_texts}, len(ocr_boxes): {len(ocr_boxes)}")
         masks = merge_sam_masks_with_ocr(masks, ocr_boxes, (image_width, image_height))
-        #print(f"after {len(masks)}")
+        # print(f"after {len(masks)}")
         data_i["region_count"] = len(masks)
 
         save_anns(image_pil, masks, image_save_folder)
@@ -360,10 +325,10 @@ def run_task(task_list, task_id, output_folder, prefix_remove="", save_yolo_resu
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Remove background from images in a folder.")
-    parser.add_argument("--sam2_ckpt", type=str, required=True, help="Path to the SAM2 checkpoint.")
+    parser.add_argument("--sam2_ckpt", "-s", type=str, required=True, help="Path to the SAM2 checkpoint.")
     parser.add_argument("--input_folder", "-i", type=str, required=True, help="The path to the input folder.")
     parser.add_argument("--output_folder", "-o", type=str, required=True, help="The path to the output folder.")
-    parser.add_argument("--hf_cache", type=str, help="The path to the HF cache folder.")
+    parser.add_argument("--save_name", type=str, default="step2_summarize", help="Name of the output summary file.")
     return parser.parse_args()
 
 
@@ -374,7 +339,6 @@ if __name__ == "__main__":
     input_folder = args.input_folder
     output_folder = args.output_folder
     sam2_ckpt = args.sam2_ckpt
-    os.environ["HF_HOME"] = args.hf_cache
 
     os.makedirs(output_folder, exist_ok=True)
     prefix_remove = input_folder if input_folder[-1] == "/" else input_folder + "/"
@@ -382,6 +346,9 @@ if __name__ == "__main__":
     task_list = get_all_images(input_folder)
 
     task_list = [{"image_path": image_path} for image_path in task_list]
+
+    # download ppocr model in advance, cache it in advance
+    _ = PaddleOCR(use_angle_cls=True, lang="ch", show_log=False)
 
     # shuffle, to get rid of truncation or stopping...
     random_indices = np.random.permutation(len(task_list))
@@ -410,4 +377,4 @@ if __name__ == "__main__":
     for t_i in t_list:
         t_i.join()
     
-    print("All done.")
+    #mp_summarize(args.output_folder, args.save_name)

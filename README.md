@@ -2,7 +2,7 @@
 
 Evaluation code for the **M**assive **M**ulti-discipline **M**ulti-tier Knowledge-Image **G**eneration benchmark.
 
-* **Dataset:** https://huggingface.co/datasets/MMMGBench/MMMGBench  
+* **Dataset:** https://huggingface.co/datasets/MMMGBench/MMMG  
 * **Metric:** MMMG-Score = Knowledge Fidelity (1 − GED) × Visual Readability (SAM 2.1).
 
 ---
@@ -10,9 +10,9 @@ Evaluation code for the **M**assive **M**ulti-discipline **M**ulti-tier Knowledg
 ## 1  Install
 
 ```bash
-conda create -n mmmg python=3.10 -y
-conda activate mmmg
-pip install -r requirements.txt
+git clone https://github.com/MMMGBench/MMMG.git
+cd MMMG
+conda env create -f environment.yaml
 ```
 
 ## 2 Prepare data
@@ -28,24 +28,29 @@ pip install -r requirements.txt
 Each folder holds your model’s generated images (<prompt_key>.png).
 
 ## 3 Run evaluation
+We use AzureOpenAI service. If you adopt your API code from OpenAI websete, please **Modify mmmg_eval/step1_knowledge_integrity.py**.
+
+Please fill in your API keys into mmmg_eval/utils/gpt_api_pool.py.
+
+Then run the following script:
 ```bash
-IMG_DIR=/data
-OUT_DIR=./results
-SAM2=/path/to/sam2.1_hiera_large.pt
-MODEL=MyT2I
-HF_CACHE=~/.cache/mmmg
+python evaluate.py \
+--img_dir IMG_FOLDER \
+--output_dir BASE_OUTPUT_FOLDER \
+--sam2_ckpt SAM2_CKPT_PATH \
+--t2i_method T2I_MODEL_NAME \
+--api_name OpenAI_MODEL_NAME \
+--hf_cache HF_CACHE
 
-# step 1 – knowledge fidelity
-python mmmg-eval/step1_knowledge_integrity.py \
-       --img_dir $IMG_DIR --output_dir $OUT_DIR/step1 \
-       --t2i_method $MODEL  --hf_cache $HF_CACHE
+```
 
-# step 2 – visual readability
-python mmmg-eval/step2_readability.py \
-       --sam2_ckpt $SAM2 -i $IMG_DIR -o $OUT_DIR/step2
-
-# step 3 – final score
-python mmmg-eval/step3_stat.py \
-       --dir1 $OUT_DIR/step1 --dir2 $OUT_DIR/step2 \
-       --output_dir $OUT_DIR/final
+For example, benchmarking GPT-4o Image generation:
+```bash
+python evaluate.py \
+--img_dir ./data/GPT-4o \
+--output_dir ./output \
+--sam2_ckpt /YOUR/PATH/TO/sam2/checkpoints/sam2.1_hiera_large.pt \
+--t2i_method GPT-4o \
+--api_name o3 \
+--hf_cache ./data/MMMG
 ```

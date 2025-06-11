@@ -8,6 +8,7 @@ import argparse
 import copy
 import math
 
+
 def parse_dependencies(dependencies):
     '''
     解析依赖关系：
@@ -29,6 +30,7 @@ def parse_dependencies(dependencies):
                         nodes = nodes[:-1]
                     else:
                         print(f"Error parsing dependency BRACKETS: {dep}")
+
                     source, target = nodes.split(', ', 1)
                         
                 except ValueError:
@@ -38,19 +40,13 @@ def parse_dependencies(dependencies):
                         print(f"Error parsing dependency: {dep}")
                         continue
                     
-                # source, target = nodes.strip(')').split(', ')
-                # source = source.strip(")").split("(")[-1].lower()
-                # target = target.strip(")").split("(")[-1].lower()
                 source = source.lower()
                 target = target.lower()
 
                 if "change(" in source.lower():
                     source = source.strip(")").split("change(")[-1].lower()
-                elif "change(" in target.lower():
+                if "change(" in target.lower():
                     target = target.strip(")").split("change(")[-1].lower() 
-                                   
-                if "+" in target:
-                    target = target.split("+")
                 
                 lower_relation = relation.lower()
                 if lower_relation == "requires":
@@ -109,12 +105,14 @@ def build_graph(elements, dependencies):
             if len(src_candidate) == 1:
                 match_src = True
                 source = src_candidate[0]
-            
+            # elif len(src_candidate) > 1:
+            #     print(f"Warning: Multiple candidates for source '{source}': {src_candidate}.")
         if not match_tgt:
             if len(tgt_candidate) == 1:
                 match_tgt = True
                 target = tgt_candidate[0]
-            
+            # elif len(tgt_candidate) > 1:
+            #     print(f"Warning: Multiple candidates for target '{target}': {tgt_candidate}.")
 
         # 如果source和target都匹配，则添加边
         if match_src and match_tgt:
@@ -158,11 +156,6 @@ def jaccard_edge_similarity(G1, G2):
     return len(intersection) / len(union) if union else 1.0
 
 def calc_weighting(s):
-    # if s<= 100:
-    #     return 1
-    # else:
-    #     ss = max((150-s)/50, 0)
-    #     return ss
     if s <= 70:
         return 1
     else:
@@ -173,9 +166,9 @@ def graph_to_vector(G, all_nodes):
     """图转成二值向量"""
     return np.array([1 if node in G.nodes else 0 for node in all_nodes])
 
-def process_data(score_dir, data_dir, dest_folder ):
+def process_data(score_dir, data_dir, visualize_dir):
     visualize = False
-    if dest_folder is not None:
+    if visualize_dir is not None:
         visualize=True
     with open(score_dir, "r", encoding="utf-8") as f:
         score_data = json.load(f)
@@ -187,7 +180,7 @@ def process_data(score_dir, data_dir, dest_folder ):
 
         level_data = data[school]
         for element in level_data.keys():
-            discipline = element.split("_")[2]
+            discipline = element.split("_")[1]
             try:
                 k_score_meta = score_data[element]["region_count"]
             except KeyError:
@@ -231,9 +224,9 @@ def process_data(score_dir, data_dir, dest_folder ):
                 plt.tight_layout()
     
                 # 保存图片到目标文件夹
-                if not os.path.exists(dest_folder):
-                    os.makedirs(dest_folder)
-                img_path = os.path.join(dest_folder, f"{school}__{element}__graph_compare.png")
+                if not os.path.exists(visualize_dir):
+                    os.makedirs(visualize_dir)
+                img_path = os.path.join(visualize_dir, f"{school}__{element}__graph_compare.png")
                 plt.savefig(img_path)
                 plt.close(fig)
         record_classes_metrics = copy.deepcopy(classes_metrics)
@@ -279,7 +272,6 @@ def process_data(score_dir, data_dir, dest_folder ):
             total_statistics["DisciplineAVG"][discipline]["Jaccard Edge"] = 0
             total_statistics["DisciplineAVG"][discipline]["K-score(w)"] = 0
 
-    print("total_statistics: ", total_statistics)
     data["statistics"] = total_statistics
     # 将统计结果写入 JSON 文件
     with open(data_dir.split(".json")[0]+"_recaptioned.json", "w", encoding="utf-8") as f:
@@ -288,10 +280,11 @@ def process_data(score_dir, data_dir, dest_folder ):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process JSON data and visualize graphs.")
-    parser.add_argument("--score_dir", required=True, help="Calculate k-score")
-    parser.add_argument("--data_dir", type=str, required=True, help="Path to the input JSON file.")
-    parser.add_argument("--dest_folder", type=str, default=None, help="Path to the destination folder for images.")
+    parser.add_argument("--score_dir", type=str, required=True, help="Path t9o the Stage1 JSON file: knowledge fidelity")
+    parser.add_argument("--data_dir", type=str, required=True, help="Path to the Stage2 JSON file: visual readability")
+    parser.add_argument("--save_dir", type=str, required=True, help="Path to the MMMG Statistics JSON file.")
+    parser.add_argument("--visualize_dir", type=str, default=None, help="Path to the destination folder for images.")
    
     args = parser.parse_args()
     
-    process_data(args.score_dir, args.data_dir, args.dest_folder)
+    process_data(args.score_dir, args.data_dir, args.visualize_dir)
