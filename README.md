@@ -54,3 +54,15 @@ python evaluate.py \
 --api_name o3 \
 --hf_cache ./data/MMMG
 ```
+
+## 📖 Citation
+
+If you find this work helpful, please consider citing:
+
+```bibtex
+@article{luo2025mmmg,
+  title={MMMG: A Massive, Multidisciplinary, Multi-Tier Generation Benchmark for Text-to-Image Reasoning},
+  author={Yuxuan Luo and Yuhui Yuan and Junwen Chen and Haonan Cai and Ziyi Yue and Yuwei Yang and Fatima Zohra Daha and Ji Li and Zhouhui Lian},
+  journal={arXiv preprint arXiv:2506.10963},
+  year={2025}
+}
