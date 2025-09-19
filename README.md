@@ -1,4 +1,7 @@
-# MMMG-Eval
+<h2 align="center">
+  <b>MMMG: A Massive, Multidisciplinary, Multi-Tier Generation Benchmark for Text-to-Image Reasoning</b>
+
+</h2>
 
 Official evaluation toolkit for **MMMG**: the **M**assive **M**ulti-discipline **M**ulti-tier Knowledge-Image **G**eneration benchmark.
 
@@ -10,7 +13,9 @@ Official evaluation toolkit for **MMMG**: the **M**assive **M**ulti-discipline *
 
 ---
 
+
 ## ✨ Overview
+![teaser](imgs/figure5.jpg)
 
 **MMMG** is a large-scale benchmark designed to assess text-to-image (T2I) models on their ability to generate *faithful* and *visually readable* images based on knowledge-intensive prompts, spanning multiple academic disciplines and educational levels.
 
@@ -22,6 +27,12 @@ Where:
 
 * **GED**: Graph Edit Distance between predicted and ground-truth concept graphs.
 * **SAM2.1**: Visual readability score based on SAM2.1 segmentation accuracy.
+
+---
+
+## 📬 News
+- **2025.9.19** Our work has been accepted by NeurIPS 2025!
+- **2025.6.10** The repository has been updated.
 
 ---
 
