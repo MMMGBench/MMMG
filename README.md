@@ -42,7 +42,7 @@ Where:
 git clone https://github.com/MMMGBench/MMMG.git
 cd MMMG
 conda env create -f environment.yaml
-conda activate mmmg-eval
+conda activate mmmg
 ```
 
 ---
