@@ -31,6 +31,7 @@ Where:
 ---
 
 ## 📬 News
+- **2025.11.29** We have benchmarked [Nano Banana Pro](https://blog.google/technology/ai/nano-banana-pro/), which is currently the leading model.
 - **2025.9.19** Our work has been accepted by NeurIPS 2025!
 - **2025.6.10** The repository has been updated.
 
