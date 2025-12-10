@@ -107,10 +107,10 @@ python evaluate.py \
 If you find MMMG helpful in your research, please consider citing our paper:
 
 ```bibtex
-@article{luo2025mmmg,
-  title={MMMG: A Massive, Multidisciplinary, Multi-Tier Generation Benchmark for Text-to-Image Reasoning},
+@inproceedings{luo2025mmmg,
+  title={Mmmg: A massive, multidisciplinary, multi-tier generation benchmark for text-to-image reasoning},
   author={Luo, Yuxuan and Yuan, Yuhui and Chen, Junwen and Cai, Haonan and Yue, Ziyi and Yang, Yuwei and Daha, Fatima Zohra and Li, Ji and Lian, Zhouhui},
-  journal={arXiv preprint arXiv:2506.10963},
+  booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems Datasets and Benchmarks Track},
   year={2025}
 }
 ```
